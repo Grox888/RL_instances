@@ -88,7 +88,7 @@ class A2C_off_policy:
         return True
 
     def exp_replay(self):
-        adv_ratio = 0.7
+        adv_ratio = 0.3
         """
         增加优质样本被选中的可能性
         """
