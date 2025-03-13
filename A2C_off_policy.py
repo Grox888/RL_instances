@@ -81,18 +81,18 @@ class A2C_off_policy:
             p = distribution[a]
         return a.to(torch.device('cpu')), p.to(torch.device('cpu'))
 
-    def exp_append(self, s, a, r, s_, p):
-        self.exp_buff.append((*s, a, r, *s_, p))
+    def exp_append(self, s, a, r, s_, p, q_value):
+        self.exp_buff.append((*s, a, r, *s_, p, q_value))
         if len(self.exp_buff) > self.exp_buff_length:
             self.exp_buff.pop(0)
         return True
 
     def exp_replay(self):
-        adv_ratio = 0.5
+        adv_ratio = 0.7
         """
         增加优质样本被选中的可能性
         """
-        distribution = torch.softmax(torch.tensor([elem[3] for elem in self.exp_buff], dtype=torch.float32, device=self.device), dim=-1)
+        distribution = torch.softmax(torch.tensor([elem[7] for elem in self.exp_buff], dtype=torch.float32, device=self.device), dim=-1)
         distribution = distribution * adv_ratio + (1 - adv_ratio) / self.exp_buff_length
         exp_buff_idx = torch.multinomial(distribution, num_samples=self.batch_size, replacement=True)
         # distribution = np.ones(len(self.exp_buff), dtype=float) / len(self.exp_buff)
@@ -126,7 +126,8 @@ class A2C_off_policy:
                 reward, period = self.env.behavior(state, self.policy_exploration, n=1, need_prob=True)
                 _, a, r, p = period[0]
                 s_ = period[-1][0]
-                self.exp_append(state, a, r, s_, p)
+                q_value = r + self.env.discount * self.critic(torch.tensor(s_, dtype=torch.float32, device=self.device)).detach().to(torch.device('cpu'))[0]
+                self.exp_append(state, a, r, s_, p, q_value)
                 state = s_
             count += 1
             # Target update
